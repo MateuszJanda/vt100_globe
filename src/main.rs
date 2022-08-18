@@ -68,9 +68,12 @@ async fn main() {
     let lines: Vec<&str> = content.split("\n").collect();
     // let words = content.split("\n").collect();
 
-    let mut stdout = MouseTerminal::from(stdout().into_raw_mode().unwrap());
+    // let mut stdout = MouseTerminal::from(stdout().into_raw_mode().unwrap());
+    let mut stdout = stdout();
 
     let mut control_code = ControlCode::new();
+
+
 
     for line in lines {
         let l = line.as_bytes();
@@ -109,6 +112,8 @@ async fn main() {
                     // let text = &l[text_start..text_end];
 
                     // print_text(command.unwrap(), text);
+
+                    write!(stdout, "{}", termion::clear::All).unwrap();
 
                     control_code.reset();
                     is_text = true;
