@@ -1,11 +1,6 @@
-// use tokio::time::{self, Duration};
-use tokio::time::Duration;
-// use tokio::time::sleep;
-// use std::default::Default;
-use std::io::{stdout, Write};
-use termion::raw::IntoRawMode;
-
 use std::fs;
+use std::io::{stdout, Write};
+use tokio::time::Duration;
 
 const ESC: u8 = 0x1b;
 
@@ -17,7 +12,6 @@ enum State {
 }
 
 enum Command {
-    Begin,
     MoveToStart,
     ClearScreen,
 }
@@ -33,12 +27,12 @@ impl ControlCode {
         }
     }
 
-    fn is_command_char(ch: u8) -> bool {
+    fn is_command_begin(ch: u8) -> bool {
         ch == ESC
     }
 
     fn add(&mut self, ch: u8) -> Option<Command> {
-        if self.state == State::Unknown && ControlCode::is_command_char(ch) {
+        if self.state == State::Unknown && ControlCode::is_command_begin(ch) {
             self.state = State::Command;
             return None;
         } else if self.state == State::Command && ch == '[' as u8 {
@@ -62,37 +56,34 @@ impl ControlCode {
 
 #[tokio::main]
 async fn main() {
-    // sleep(Duration::from_millis(100)).await;
-    let mut interval = tokio::time::interval(Duration::from_millis(40));
-    interval.tick().await;
-
     let content = fs::read_to_string("globe.vt").unwrap();
-
     let lines: Vec<&str> = content.split("\n").collect();
 
     let mut stdout = stdout();
-
     let mut control_code = ControlCode::new();
 
     let mut line_num: u16 = 1;
+    let mut interval = tokio::time::interval(Duration::from_millis(40));
+    interval.tick().await;
     for line in lines.iter().cycle() {
-        let l = line.as_bytes();
+        let line_byte = line.as_bytes();
 
         let mut text_start = 0;
         let mut is_text = true;
-        for (pos, ch) in l.iter().enumerate() {
-            if is_text && ControlCode::is_command_char(*ch) {
+        for (pos, ch) in line_byte.iter().enumerate() {
+            if is_text && ControlCode::is_command_begin(*ch) {
                 control_code.add(*ch);
                 is_text = false;
 
                 let text_end = pos;
-                let text = &l[text_start..text_end];
-                let s = std::str::from_utf8(text).unwrap();
-                // write!(stdout, "{}", s).unwrap();
-                // write!(stdout, "asdf").unwrap();
-                // write!(stdout, "{}", s.len()).unwrap();
-                // write!(stdout, "{} {}", text_start, text_end).unwrap();
-                write!(stdout, "{} {}", termion::cursor::Goto(0, line_num), s).unwrap();
+                let text = &line_byte[text_start..text_end];
+                write!(
+                    stdout,
+                    "{} {}",
+                    termion::cursor::Goto(0, line_num),
+                    std::str::from_utf8(text).unwrap()
+                )
+                .unwrap();
             } else {
                 let command = control_code.add(*ch);
 
@@ -100,20 +91,15 @@ async fn main() {
                     None => (),
                     Some(Command::MoveToStart) => {
                         write!(stdout, "{}", termion::clear::All).unwrap();
-                        // write!(stdout, "asdf").unwrap();
                         line_num = 1;
                         interval.tick().await;
                     }
                     Some(Command::ClearScreen) => {
                         write!(stdout, "{}", termion::clear::All).unwrap();
-                        // stdout.flush().unwrap();
-                        // interval.tick().await;
                     }
-                    _ => (),
                 }
 
                 if command.is_some() {
-                    // write!(stdout, "asdf").unwrap();
                     control_code.reset();
                     is_text = true;
                     text_start = pos + 1;
@@ -122,25 +108,19 @@ async fn main() {
         }
 
         if is_text {
-            let text_end = l.len();
-            let text = &l[text_start..text_end];
-            let s = std::str::from_utf8(text).unwrap();
-            write!(stdout, "{}{}{}", termion::cursor::Hide, termion::cursor::Goto(1, line_num), s).unwrap();
-            // write!(stdout, "{}\n", line_num).unwrap();
+            let text_end = line_byte.len();
+            let text = &line_byte[text_start..text_end];
+            write!(
+                stdout,
+                "{}{}{}",
+                termion::cursor::Hide,
+                termion::cursor::Goto(1, line_num),
+                std::str::from_utf8(text).unwrap()
+            )
+            .unwrap();
         }
 
         line_num += 1;
         stdout.flush().unwrap();
     }
-
-    // println!("100 ms have elapsed");
-    // let mut stdout = stdout().into_raw_mode().unwrap();
-
-    // write!(stdout, "Hey there.").unwrap();
-    // write!(stdout, "Hey \nthere.").unwrap();
-    // write!(stdout, "\\033[32mThis is in green\\033[0m").unwrap();
 }
-
-// fn print_text(stdout: &mut Stdout, line_num: i32, text: &[u8]) {
-
-// }
