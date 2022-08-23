@@ -66,17 +66,17 @@ async fn main() {
     let mut interval = tokio::time::interval(Duration::from_millis(100));
     interval.tick().await;
     for line in lines.iter().cycle() {
-        let line_byte = line.as_bytes();
+        let line_bytes = line.as_bytes();
 
         let mut text_start = 0;
         let mut is_text = true;
-        for (pos, ch) in line_byte.iter().enumerate() {
+        for (pos, ch) in line_bytes.iter().enumerate() {
             if is_text && ControlCode::is_new_command(*ch) {
                 control_code.add(*ch);
                 is_text = false;
 
                 let text_end = pos;
-                let text = &line_byte[text_start..text_end];
+                let text = &line_bytes[text_start..text_end];
                 write!(
                     stdout,
                     "{} {}",
@@ -109,8 +109,8 @@ async fn main() {
         }
 
         if is_text {
-            let text_end = line_byte.len();
-            let text = &line_byte[text_start..text_end];
+            let text_end = line_bytes.len();
+            let text = &line_bytes[text_start..text_end];
             write!(
                 stdout,
                 "{}{}{}",
