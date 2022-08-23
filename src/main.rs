@@ -1,4 +1,5 @@
-// use std::time::Duration;
+// use tokio::time::{self, Duration};
+use tokio::time::{ Duration};
 // use tokio::time::sleep;
 use std::default::Default;
 use std::io::{stdout, Write};
@@ -62,6 +63,8 @@ impl ControlCode {
 #[tokio::main]
 async fn main() {
     // sleep(Duration::from_millis(100)).await;
+    let mut interval = tokio::time::interval(Duration::from_millis(100));
+    interval.tick().await;
 
     let content = fs::read_to_string("globe.vt").unwrap();
 
@@ -71,7 +74,8 @@ async fn main() {
 
     let mut control_code = ControlCode::new();
 
-    for (line_num, line) in lines.iter().enumerate() {
+    let mut line_num = 0;
+    for line in lines.iter().cycle() {
         let l = line.as_bytes();
 
         let mut text_start = 0;
@@ -79,30 +83,35 @@ async fn main() {
         for (pos, ch) in l.iter().enumerate() {
             if is_text && ControlCode::is_command_char(*ch) {
                 control_code.add(*ch);
-
                 is_text = false;
-                let text_end = pos;
 
+                let text_end = pos;
                 let text = &l[text_start..text_end];
                 let s = std::str::from_utf8(text).unwrap();
-                write!(stdout, "{}", s).unwrap();
+                // write!(stdout, "{}", s).unwrap();
                 // write!(stdout, "asdf").unwrap();
                 // write!(stdout, "{}", s.len()).unwrap();
-                write!(stdout, "{} {}", text_start, text_end).unwrap();
+                // write!(stdout, "{} {}", text_start, text_end).unwrap();
+                write!(stdout, "{} {}", termion::cursor::Goto(0, line_num as u16 + 1), s).unwrap();
+
             } else {
                 let command = control_code.add(*ch);
 
                 match command {
                     None => (),
-                    Some(Command::MoveToStart) => (),
+                    Some(Command::MoveToStart) => {
+                        line_num = 0;
+                    },
                     Some(Command::ClearScreen) => {
-                        // write!(stdout, "{}", termion::clear::All).unwrap()
+                        stdout.flush().unwrap();
+                        // write!(stdout, "{}", termion::clear::All).unwrap();
+                        interval.tick().await;
                     }
                     _ => (),
                 }
 
                 if command.is_some() {
-                    write!(stdout, "asdf").unwrap();
+                    // write!(stdout, "asdf").unwrap();
                     control_code.reset();
                     is_text = true;
                     text_start = pos + 1;
@@ -114,9 +123,11 @@ async fn main() {
             let text_end = l.len();
             let text = &l[text_start..text_end];
             let s = std::str::from_utf8(text).unwrap();
-            write!(stdout, "{}\n", s).unwrap();
+            write!(stdout, "{} {}", termion::cursor::Goto(0, line_num as u16 + 1), s).unwrap();
 
         }
+
+        line_num += 1;
 
     }
 
