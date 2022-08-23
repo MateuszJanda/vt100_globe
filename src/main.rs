@@ -1,7 +1,7 @@
 // use tokio::time::{self, Duration};
-use tokio::time::{ Duration};
+use tokio::time::Duration;
 // use tokio::time::sleep;
-use std::default::Default;
+// use std::default::Default;
 use std::io::{stdout, Write};
 use termion::raw::IntoRawMode;
 
@@ -63,7 +63,7 @@ impl ControlCode {
 #[tokio::main]
 async fn main() {
     // sleep(Duration::from_millis(100)).await;
-    let mut interval = tokio::time::interval(Duration::from_millis(100));
+    let mut interval = tokio::time::interval(Duration::from_millis(40));
     interval.tick().await;
 
     let content = fs::read_to_string("globe.vt").unwrap();
@@ -74,7 +74,7 @@ async fn main() {
 
     let mut control_code = ControlCode::new();
 
-    let mut line_num = 0;
+    let mut line_num: u16 = 1;
     for line in lines.iter().cycle() {
         let l = line.as_bytes();
 
@@ -92,20 +92,22 @@ async fn main() {
                 // write!(stdout, "asdf").unwrap();
                 // write!(stdout, "{}", s.len()).unwrap();
                 // write!(stdout, "{} {}", text_start, text_end).unwrap();
-                write!(stdout, "{} {}", termion::cursor::Goto(0, line_num as u16 + 1), s).unwrap();
-
+                write!(stdout, "{} {}", termion::cursor::Goto(0, line_num), s).unwrap();
             } else {
                 let command = control_code.add(*ch);
 
                 match command {
                     None => (),
                     Some(Command::MoveToStart) => {
-                        line_num = 0;
-                    },
-                    Some(Command::ClearScreen) => {
-                        stdout.flush().unwrap();
-                        // write!(stdout, "{}", termion::clear::All).unwrap();
+                        write!(stdout, "{}", termion::clear::All).unwrap();
+                        // write!(stdout, "asdf").unwrap();
+                        line_num = 1;
                         interval.tick().await;
+                    }
+                    Some(Command::ClearScreen) => {
+                        write!(stdout, "{}", termion::clear::All).unwrap();
+                        // stdout.flush().unwrap();
+                        // interval.tick().await;
                     }
                     _ => (),
                 }
@@ -123,12 +125,12 @@ async fn main() {
             let text_end = l.len();
             let text = &l[text_start..text_end];
             let s = std::str::from_utf8(text).unwrap();
-            write!(stdout, "{} {}", termion::cursor::Goto(0, line_num as u16 + 1), s).unwrap();
-
+            write!(stdout, "{}{}{}", termion::cursor::Hide, termion::cursor::Goto(1, line_num), s).unwrap();
+            // write!(stdout, "{}\n", line_num).unwrap();
         }
 
         line_num += 1;
-
+        stdout.flush().unwrap();
     }
 
     // println!("100 ms have elapsed");
