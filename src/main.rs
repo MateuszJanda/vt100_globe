@@ -79,8 +79,9 @@ async fn main() {
                 let text = &line_bytes[text_start..text_end];
                 write!(
                     stdout,
-                    "{} {}",
-                    termion::cursor::Goto(0, line_num),
+                    "{}{}{}",
+                    termion::cursor::Hide,
+                    termion::cursor::Goto(1, line_num),
                     std::str::from_utf8(text).unwrap()
                 )
                 .unwrap();
