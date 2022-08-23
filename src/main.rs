@@ -10,8 +10,9 @@ const ESC: u8 = 0x1b;
 
 #[derive(PartialEq)]
 enum State {
-    CSI,
     Unknown,
+    Command,
+    CSI,
 }
 
 enum Command {
@@ -31,15 +32,18 @@ impl ControlCode {
         }
     }
 
-    fn is_comand(ch: u8) -> bool {
+    fn is_command_char(ch: u8) -> bool {
         ch == ESC
     }
 
     fn add(&mut self, ch: u8) -> Option<Command> {
-        if self.state == State::Unknown && ch == '[' as u8 {
+        if self.state == State::Unknown && ControlCode::is_command_char(ch) {
+            self.state = State::Command;
+            return None;
+        } else if self.state == State::Command && ch == '[' as u8 {
             self.state = State::CSI;
             return None;
-        } else if self.state == State::CSI && ch == 'H' as u8 {
+        } else if self.state == State::CSI {
             return match ch as char {
                 'H' => Some(Command::MoveToStart),
                 'J' => Some(Command::ClearScreen),
@@ -51,7 +55,7 @@ impl ControlCode {
     }
 
     fn reset(&mut self) {
-        self.state == State::Unknown;
+        self.state = State::Unknown;
     }
 }
 
@@ -73,14 +77,18 @@ async fn main() {
         let mut text_start = 0;
         let mut is_text = true;
         for (pos, ch) in l.iter().enumerate() {
-            if is_text && ControlCode::is_comand(*ch) {
+            if is_text && ControlCode::is_command_char(*ch) {
+                control_code.add(*ch);
+
                 is_text = false;
                 let text_end = pos;
 
-                control_code.add(*ch);
-
                 let text = &l[text_start..text_end];
-                print_text(line_num as i32, text);
+                let s = std::str::from_utf8(text).unwrap();
+                write!(stdout, "{}", s).unwrap();
+                // write!(stdout, "asdf").unwrap();
+                // write!(stdout, "{}", s.len()).unwrap();
+                write!(stdout, "{} {}", text_start, text_end).unwrap();
             } else {
                 let command = control_code.add(*ch);
 
@@ -88,18 +96,28 @@ async fn main() {
                     None => (),
                     Some(Command::MoveToStart) => (),
                     Some(Command::ClearScreen) => {
-                        write!(stdout, "{}", termion::clear::All).unwrap()
+                        // write!(stdout, "{}", termion::clear::All).unwrap()
                     }
                     _ => (),
                 }
 
                 if command.is_some() {
+                    write!(stdout, "asdf").unwrap();
                     control_code.reset();
                     is_text = true;
                     text_start = pos + 1;
                 }
             }
         }
+
+        if is_text {
+            let text_end = l.len();
+            let text = &l[text_start..text_end];
+            let s = std::str::from_utf8(text).unwrap();
+            write!(stdout, "{}\n", s).unwrap();
+
+        }
+
     }
 
     // println!("100 ms have elapsed");
@@ -110,4 +128,6 @@ async fn main() {
     // write!(stdout, "\\033[32mThis is in green\\033[0m").unwrap();
 }
 
-fn print_text(line_num: i32, text: &[u8]) {}
+// fn print_text(stdout: &mut Stdout, line_num: i32, text: &[u8]) {
+
+// }
