@@ -27,12 +27,12 @@ impl ControlCode {
         }
     }
 
-    fn is_command_begin(ch: u8) -> bool {
+    fn is_new_command(ch: u8) -> bool {
         ch == ESC
     }
 
     fn add(&mut self, ch: u8) -> Option<Command> {
-        if self.state == State::Unknown && ControlCode::is_command_begin(ch) {
+        if self.state == State::Unknown && ControlCode::is_new_command(ch) {
             self.state = State::Command;
             return None;
         } else if self.state == State::Command && ch == '[' as u8 {
@@ -63,7 +63,7 @@ async fn main() {
     let mut control_code = ControlCode::new();
 
     let mut line_num: u16 = 1;
-    let mut interval = tokio::time::interval(Duration::from_millis(40));
+    let mut interval = tokio::time::interval(Duration::from_millis(100));
     interval.tick().await;
     for line in lines.iter().cycle() {
         let line_byte = line.as_bytes();
@@ -71,7 +71,7 @@ async fn main() {
         let mut text_start = 0;
         let mut is_text = true;
         for (pos, ch) in line_byte.iter().enumerate() {
-            if is_text && ControlCode::is_command_begin(*ch) {
+            if is_text && ControlCode::is_new_command(*ch) {
                 control_code.add(*ch);
                 is_text = false;
 
@@ -90,6 +90,7 @@ async fn main() {
                 match command {
                     None => (),
                     Some(Command::MoveToStart) => {
+                        stdout.flush().unwrap();
                         write!(stdout, "{}", termion::clear::All).unwrap();
                         line_num = 1;
                         interval.tick().await;
@@ -121,6 +122,5 @@ async fn main() {
         }
 
         line_num += 1;
-        stdout.flush().unwrap();
     }
 }
