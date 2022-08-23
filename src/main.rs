@@ -7,7 +7,6 @@ use termion::raw::IntoRawMode;
 use std::fs;
 
 const ESC: u8 = 0x1b;
-const CSI: u8 = 0x5b; // [
 
 #[derive(PartialEq)]
 enum State {
@@ -16,9 +15,9 @@ enum State {
 }
 
 enum Command {
+    Begin,
     MoveToStart,
     ClearScreen,
-    None,
 }
 
 struct ControlCode {
@@ -32,19 +31,20 @@ impl ControlCode {
         }
     }
 
-    fn is_ControlCode(ch: u8) -> bool {
+    fn is_comand(ch: u8) -> bool {
         ch == ESC
     }
 
     fn add(&mut self, ch: u8) -> Option<Command> {
         if self.state == State::Unknown && ch == '[' as u8 {
             self.state = State::CSI;
-            // self.transition();
             return None;
         } else if self.state == State::CSI && ch == 'H' as u8 {
-            return Some(Command::MoveToStart);
-        } else if self.state == State::CSI && ch == 'J' as u8 {
-            return Some(Command::ClearScreen);
+            return match ch as char {
+                'H' => Some(Command::MoveToStart),
+                'J' => Some(Command::ClearScreen),
+                _ => None,
+            };
         }
 
         None
@@ -53,10 +53,6 @@ impl ControlCode {
     fn reset(&mut self) {
         self.state == State::Unknown;
     }
-
-    // fn transition(&mut self) {
-
-    // }
 }
 
 #[tokio::main]
@@ -66,64 +62,42 @@ async fn main() {
     let content = fs::read_to_string("globe.vt").unwrap();
 
     let lines: Vec<&str> = content.split("\n").collect();
-    // let words = content.split("\n").collect();
 
-    // let mut stdout = MouseTerminal::from(stdout().into_raw_mode().unwrap());
     let mut stdout = stdout();
 
     let mut control_code = ControlCode::new();
 
-
-
-    for line in lines {
+    for (line_num, line) in lines.iter().enumerate() {
         let l = line.as_bytes();
 
-        // Look for ControlCode
-        // let mut cmd_start = 0;
-        // let mut cmd_end = 0;
         let mut text_start = 0;
-        let mut text_end = 0;
-
         let mut is_text = true;
         for (pos, ch) in l.iter().enumerate() {
-            if is_text && ControlCode::is_ControlCode(*ch) {
+            if is_text && ControlCode::is_comand(*ch) {
                 is_text = false;
-                text_end = pos;
+                let text_end = pos;
 
-                control_code.reset();
+                control_code.add(*ch);
 
                 let text = &l[text_start..text_end];
-                // print_text(Command::None, text);
-
-                // cmd_start = pos;
-                // cmd_end = pos;
-                // text_start = pos;
-                // text_end = pos;
-                continue;
-            }
-
-            if is_text {
-                text_end = pos;
-                // cmd_start = pos;
+                print_text(line_num as i32, text);
             } else {
                 let command = control_code.add(*ch);
 
-                if command.is_some() {
-                    // let text = &l[text_start..text_end];
-
-                    // print_text(command.unwrap(), text);
-
-                    write!(stdout, "{}", termion::clear::All).unwrap();
-
-                    control_code.reset();
-                    is_text = true;
+                match command {
+                    None => (),
+                    Some(Command::MoveToStart) => (),
+                    Some(Command::ClearScreen) => {
+                        write!(stdout, "{}", termion::clear::All).unwrap()
+                    }
+                    _ => (),
                 }
 
-                // let cmd = &l[cmd_start..cmd_end];
-
-                // print_text(cmd, text);
-
-                // cmd_start = pos + 1;
+                if command.is_some() {
+                    control_code.reset();
+                    is_text = true;
+                    text_start = pos + 1;
+                }
             }
         }
     }
@@ -136,4 +110,4 @@ async fn main() {
     // write!(stdout, "\\033[32mThis is in green\\033[0m").unwrap();
 }
 
-fn print_text(text: &[u8]) {}
+fn print_text(line_num: i32, text: &[u8]) {}
