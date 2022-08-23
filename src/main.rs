@@ -1,5 +1,6 @@
 use std::fs;
 use std::io::{stdout, Write};
+use termion::screen::AlternateScreen;
 use tokio::time::Duration;
 
 const ESC: u8 = 0x1b;
@@ -16,13 +17,13 @@ enum Command {
     ClearScreen,
 }
 
-struct ControlCode {
+struct CommandFsm {
     state: State,
 }
 
-impl ControlCode {
+impl CommandFsm {
     fn new() -> Self {
-        ControlCode {
+        CommandFsm {
             state: State::Unknown,
         }
     }
@@ -32,7 +33,7 @@ impl ControlCode {
     }
 
     fn add(&mut self, ch: u8) -> Option<Command> {
-        if self.state == State::Unknown && ControlCode::is_new_command(ch) {
+        if self.state == State::Unknown && CommandFsm::is_new_command(ch) {
             self.state = State::Command;
             return None;
         } else if self.state == State::Command && ch == '[' as u8 {
@@ -59,8 +60,8 @@ async fn main() {
     let content = fs::read_to_string("globe.vt").unwrap();
     let lines: Vec<&str> = content.split("\n").collect();
 
-    let mut stdout = stdout();
-    let mut control_code = ControlCode::new();
+    let mut screen = AlternateScreen::from(stdout());
+    let mut command_fsm = CommandFsm::new();
 
     let mut line_num: u16 = 1;
     let mut interval = tokio::time::interval(Duration::from_millis(100));
@@ -71,14 +72,14 @@ async fn main() {
         let mut text_start = 0;
         let mut is_text = true;
         for (pos, ch) in line_bytes.iter().enumerate() {
-            if is_text && ControlCode::is_new_command(*ch) {
-                control_code.add(*ch);
+            if is_text && CommandFsm::is_new_command(*ch) {
+                command_fsm.add(*ch);
                 is_text = false;
 
                 let text_end = pos;
                 let text = &line_bytes[text_start..text_end];
                 write!(
-                    stdout,
+                    screen,
                     "{}{}{}",
                     termion::cursor::Hide,
                     termion::cursor::Goto(1, line_num),
@@ -86,23 +87,23 @@ async fn main() {
                 )
                 .unwrap();
             } else {
-                let command = control_code.add(*ch);
+                let command = command_fsm.add(*ch);
 
                 match command {
                     None => (),
                     Some(Command::MoveToStart) => {
-                        stdout.flush().unwrap();
-                        write!(stdout, "{}", termion::clear::All).unwrap();
+                        screen.flush().unwrap();
+                        write!(screen, "{}", termion::clear::All).unwrap();
                         line_num = 1;
                         interval.tick().await;
                     }
                     Some(Command::ClearScreen) => {
-                        write!(stdout, "{}", termion::clear::All).unwrap();
+                        write!(screen, "{}", termion::clear::All).unwrap();
                     }
                 }
 
                 if command.is_some() {
-                    control_code.reset();
+                    command_fsm.reset();
                     is_text = true;
                     text_start = pos + 1;
                 }
@@ -113,7 +114,7 @@ async fn main() {
             let text_end = line_bytes.len();
             let text = &line_bytes[text_start..text_end];
             write!(
-                stdout,
+                screen,
                 "{}{}{}",
                 termion::cursor::Hide,
                 termion::cursor::Goto(1, line_num),
