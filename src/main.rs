@@ -86,7 +86,7 @@ async fn main() {
                     std::str::from_utf8(text).unwrap()
                 )
                 .unwrap();
-            } else {
+            } else if !is_text {
                 let command = command_fsm.add(*ch);
 
                 match command {
