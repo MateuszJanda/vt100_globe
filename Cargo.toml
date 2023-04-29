@@ -1,5 +1,7 @@
 [package]
 name = "vt100_player"
+authors = ["Mateusz Janda <mateusz.janda@gmail.com>"]
+repository = "https://github.com/MateuszJanda/vt100_globe"
 version = "0.1.0"
 edition = "2021"
 
